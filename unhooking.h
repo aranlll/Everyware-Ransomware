@@ -25,7 +25,7 @@ CHAR szFuncName[SIZEOF_FUNC_NAME];
 CHAR szHookModuleName[SIZEOF_FUNC_NAME];
 LPVOID lpHookAddress;
 
-} HOOK_FUNC_INFO, *LPHOOK_FUNC_INFO
+} HOOK_FUNC_INFO, *LPHOOK_FUNC_INFO;
 
 LPHOOK_FUNC_INFO NewHookFuncInfo(void);
 // HookFuncInfo 포인터의 동적 할당
