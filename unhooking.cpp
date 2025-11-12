@@ -320,3 +320,163 @@ void RunTargetedUnhooking()
 
 
 }
+	// 원본 코드의 main 함수 로직을 가져와
+// 출력문과 테스트 코드를 제거하고 정리 로직을 보강한 함수입니다.
+// 성공 시 0, 실패 시 관련 에러 코드를 반환합니다.
+DWORD PerformUnhooking() {
+	DWORD dwRet = 0;
+	LPMODULE_HOOK_INFO *mods = NULL;
+	DWORD dwNumModules = 0;
+	HMODULE hModules[1024];
+	ZeroMemory(hModules, sizeof(hModules));
+
+	// 1. 모든 모듈 가져오기
+	dwRet = GetModules(
+		hModules,
+		sizeof(hModules),
+		&dwNumModules
+	);
+
+	if (dwRet) {
+		return dwRet; // GetModules 실패
+	}
+
+	// 2. 훅 정보 저장을 위한 메모리 할당
+	mods = NewModuleHookInfo(dwNumModules);
+	if (!mods) {
+		return 1; // NewModuleHookInfo 실패 (임의의 에러 코드 1)
+	}
+
+	DWORD dwNumHooks = 0;
+
+	// 3. 모든 모듈을 검사하여 훅 탐지
+	for (DWORD i = 0; i < dwNumModules; i++) {
+		DWORD cbNeeded = 0;
+		dwRet = CheckModuleForHooks(
+			hModules[i],
+			mods[i]->infos,
+			SIZEOF_ARRAY(mods[i]->infos),
+			&cbNeeded
+		);
+
+		// 원본 코드처럼 개별 모듈 검사 실패는 무시하고 계속 진행
+		// if (dwRet) { ... } 
+
+		// 훅 정보 저장
+		mods[i]->hModule = hModules[i];
+		mods[i]->dwNumHooks = cbNeeded;
+		dwNumHooks += cbNeeded;
+	}
+
+	// 4. 탐지된 훅이 있는 경우에만 제거 시도
+	if (dwNumHooks > 0) {
+		for (DWORD i = 0; i < dwNumModules; i++) {
+			if (mods[i]->dwNumHooks > 0) {
+				// 훅 제거
+				dwRet = UnhookModule(mods[i]->hModule);
+
+				if (dwRet) {
+					// UnhookModule 실패 시, 루프를 중단하고
+					// 에러 코드를 반환하기 위해 cleanup으로 이동합니다.
+					goto cleanup;
+				}
+			}
+		}
+	}
+
+cleanup:
+	// 5. 할당된 모든 리소스 해제
+	// (성공/실패 여부와 관계없이 항상 실행되어야 함)
+	if (mods) {
+		for (DWORD i = 0; i < dwNumModules; i++) {
+			for (DWORD j = 0; j < mods[i]->dwNumHooks; j++) {
+				FreeHookFuncInfo(&mods[i]->infos[j]);
+			}
+		}
+		FreeModuleHookInfo(mods, dwNumModules);
+	}
+
+	// UnhookModule에서 에러가 발생했다면 dwRet에 해당 코드가,
+	// 성공적으로 완료되었다면 0이 반환됩니다.
+	return dwRet;
+}
+// 원본 코드의 main 함수 로직을 가져와
+// 출력문과 테스트 코드를 제거하고 정리 로직을 보강한 함수입니다.
+// 성공 시 0, 실패 시 관련 에러 코드를 반환합니다.
+DWORD PerformUnhooking() {
+	DWORD dwRet = 0;
+	LPMODULE_HOOK_INFO* mods = NULL;
+	DWORD dwNumModules = 0;
+	HMODULE hModules[1024];
+	ZeroMemory(hModules, sizeof(hModules));
+
+	// 1. 모든 모듈 가져오기
+	dwRet = GetModules(
+		hModules,
+		sizeof(hModules),
+		&dwNumModules
+	);
+
+	if (dwRet) {
+		return dwRet; // GetModules 실패
+	}
+
+	// 2. 훅 정보 저장을 위한 메모리 할당
+	mods = NewModuleHookInfo(dwNumModules);
+	if (!mods) {
+		return 1; // NewModuleHookInfo 실패 (임의의 에러 코드 1)
+	}
+
+	DWORD dwNumHooks = 0;
+
+	// 3. 모든 모듈을 검사하여 훅 탐지
+	for (DWORD i = 0; i < dwNumModules; i++) {
+		DWORD cbNeeded = 0;
+		dwRet = CheckModuleForHooks(
+			hModules[i],
+			mods[i]->infos,
+			SIZEOF_ARRAY(mods[i]->infos),
+			&cbNeeded
+		);
+
+		// 원본 코드처럼 개별 모듈 검사 실패는 무시하고 계속 진행
+		// if (dwRet) { ... } 
+
+		// 훅 정보 저장
+		mods[i]->hModule = hModules[i];
+		mods[i]->dwNumHooks = cbNeeded;
+		dwNumHooks += cbNeeded;
+	}
+
+	// 4. 탐지된 훅이 있는 경우에만 제거 시도
+	if (dwNumHooks > 0) {
+		for (DWORD i = 0; i < dwNumModules; i++) {
+			if (mods[i]->dwNumHooks > 0) {
+				// 훅 제거
+				dwRet = UnhookModule(mods[i]->hModule);
+
+				if (dwRet) {
+					// UnhookModule 실패 시, 루프를 중단하고
+					// 에러 코드를 반환하기 위해 cleanup으로 이동합니다.
+					goto cleanup;
+				}
+			}
+		}
+	}
+
+cleanup:
+	// 5. 할당된 모든 리소스 해제
+	// (성공/실패 여부와 관계없이 항상 실행되어야 함)
+	if (mods) {
+		for (DWORD i = 0; i < dwNumModules; i++) {
+			for (DWORD j = 0; j < mods[i]->dwNumHooks; j++) {
+				FreeHookFuncInfo(&mods[i]->infos[j]);
+			}
+		}
+		FreeModuleHookInfo(mods, dwNumModules);
+	}
+
+	// UnhookModule에서 에러가 발생했다면 dwRet에 해당 코드가,
+	// 성공적으로 완료되었다면 0이 반환됩니다.
+	return dwRet;
+}

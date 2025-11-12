@@ -75,3 +75,5 @@ DWORD GetModules(HMODULE *hModules, const DWORD nSize, LPDWORD dwNumModules);
 -Size : 버퍼의 크기
 -dwNumModules : 함수가 실제로 찾은 모듈의 총 개수를 저장할 포인터
 */
+
+DWORD PerformUnhooking()
