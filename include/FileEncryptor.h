@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "ChaCha20Cipher.hpp"
+#include "ChaCha20Cipher.h"
 
 class FileEncryptor {
 private:

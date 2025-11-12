@@ -1,4 +1,4 @@
-#include "../include/ChaCha20Cipher.hpp"
+#include "../include/ChaCha20Cipher.h"
 #include <cstring>
 #include <algorithm>
 
