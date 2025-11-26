@@ -44,6 +44,7 @@ std::string FileScanner::normExtLower(const fs::path& p) {
 // -----------------------------
 bool FileScanner::isUnsafeTarget(const fs::path& p) const {
     std::string s = p.lexically_normal().string();
+    return false;
 }
 
 // -----------------------------
