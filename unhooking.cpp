@@ -1,3 +1,4 @@
+#include "unhooking.h"
 #include <iostream>
 #include <windows.h>
 #include <winternl.h> // PIMAGE_... 헤더 구조체를 위해 필요
@@ -6,43 +7,75 @@
 #include <string>
 #include <vector>
 
+
+LPHOOK_FUNC_INFO NewHookFuncInfo(void) {
+	LPHOOK_FUNC_INFO info = (LPHOOK_FUNC_INFO)HeapAlloc(
+		GetProcessHeap(),			// Handle to heap.
+		HEAP_ZERO_MEMORY,			// Heap allocation flag options.
+		sizeof(HOOK_FUNC_INFO)		// Number of bytes to be allocated.
+	);
+
+	if (!info) {
+		return NULL;
+	}
+
+	info->hModule = NULL;
+	info->lpFuncAddress = NULL;
+	ZeroMemory(info->szFuncName, sizeof(info->szFuncName));
+	ZeroMemory(info->szHookModuleName, sizeof(info->szHookModuleName));
+	info->lpHookAddress = NULL;
+
+	return info;
+}
+DWORD GetModules(HMODULE* hModules, const DWORD nSize, LPDWORD dwNumModules) {
+	DWORD cbNeeded = 0;
+
+	BOOL bRet = EnumProcessModules(
+		GetCurrentProcess(),	// Process handle.
+		hModules,				// Module array.
+		nSize,					// Size of module array.
+		&cbNeeded				// Number of bytes required to store all module 
+		// handles.
+	);
+
+	// Check if the call was successful.
+	if (bRet == FALSE) {
+		return ERR_ENUM_PROCESS_MODULES_FAILED;
+	}
+
+	// If cbNeeded > nSize, increase the size of the module array and call this function again.
+	if (cbNeeded > nSize) {
+		return ERR_SIZE_TOO_SMALL;
+	}
+
+	// Get the number of modules enumerated.
+	*dwNumModules = cbNeeded / sizeof(HMODULE);
+
+	return ERR_SUCCESS;
+}
+
 /*
- * ==========================================================================
- * "unhooking.h"의 추정 내용 (헤더 파일이 없으므로 여기에 직접 정의)
- * ==========================================================================
+ * FreeHookFuncInfo
+ * Frees the heap-allocated resource provided by the NewHookFuncInfo function. The pointer
+ * is set to NULL after being released.
+ *
+ * Parameters:
+ * - info: Reference to a heap-allocated pointer to HOOK_FUNC_INFO.
+ *
+ * Returns TRUE on success, else, FALSE.
  */
+BOOL FreeHookFuncInfo(LPHOOK_FUNC_INFO* info) {
+	BOOL bRet = HeapFree(
+		GetProcessHeap(),	// Handle to heap.
+		0,					// Heap free flag options.
+		*info				// Pointer to memory to be freed.
+	);
 
- // 1. 훅 타입 정의
-typedef enum _HOOK_TYPE {
-	HOOK_NONE,
-	HOOK_UNSUPPORTED,
-	HOOK_RELATIVE,
-	HOOK_ABSOLUTE,
-	HOOK_ABSOLUTE_INDIRECT,
-	HOOK_ABSOLUTE_INDIRECT_64
-} HOOK_TYPE;
+	// Avoid dangling pointer.
+	*info = NULL;
 
-// 2. 오류 코드 정의 (임의의 값)
-#define ERR_SUCCESS 0
-#define ERR_MOD_NAME_NOT_FOUND 1
-#define ERR_CREATE_FILE_FAILED 2
-#define ERR_CREATE_FILE_MAPPING_FAILED 3
-#define ERR_CREATE_FILE_MAPPING_ALREADY_EXISTS 4
-#define ERR_MAP_FILE_FAILED 5
-#define ERR_MEM_DEPROTECT_FAILED 6
-#define ERR_MEM_REPROTECT_FAILED 7
-#define ERR_TEXT_SECTION_NOT_FOUND 8
-#define ERR_ENUM_PROCESS_MODULES_FAILED 9
-#define ERR_SIZE_TOO_SMALL 10
-
-// 3. 훅 정보 구조체 (이 코드에서는 직접 사용되진 않지만 원본에 있었음)
-typedef struct _HOOK_FUNC_INFO {
-	HMODULE hModule;
-	LPVOID lpFuncAddress;
-	CHAR szFuncName[256];
-	CHAR szHookModuleName[MAX_PATH];
-	LPVOID lpHookAddress;
-} HOOK_FUNC_INFO, * LPHOOK_FUNC_INFO;
+	return bRet;
+}
 
 /*
  * ==========================================================================
@@ -185,7 +218,7 @@ static DWORD SurgicallyRepairHooks(const HMODULE hModule, const LPVOID lpMapping
 		HOOK_TYPE hookType = IsHooked(lpLocalFuncAddress, &dwHookOffset);
 
 		if (hookType != HOOK_NONE && hookType != HOOK_UNSUPPORTED) {
-
+			std::cout << "  [!] Hook detected and repaired: " << pszFuncName << std::endl;
 
 			// 3-4. 원본 코드로 복구를 시도합니다.
 			// 16바이트를 복구한다고 가정합니다. (대부분의 핫패치 훅은 16바이트 이내)
@@ -291,7 +324,13 @@ DWORD UnhookModule(const HMODULE hModule) {
  /**
   * @brief 타겟 리스트에 있는 핵심 모듈들만 언후킹을 시도합니다.
   */
-void RunTargetedUnhooking()
+  /**
+   * @brief 타겟 리스트에 있는 핵심 모듈들만 "Surgical" 방식으로 언후킹합니다.
+   * (기존 RunTargetedUnhooking 함수의 이름을 변경하고 반환값 추가)
+   * @return 성공 시 ERR_SUCCESS (0), 하나 이상의 모듈에서 실패 시
+   * 첫 번째로 발생한 에러 코드를 반환합니다.
+   */
+DWORD PerformUnhooking()
 {
 	// 1. EDR/백신이 주로 후킹하는 핵심 DLL 리스트를 정의합니다.
 	const char* targetDlls[] = {
@@ -303,180 +342,32 @@ void RunTargetedUnhooking()
 		"user32.dll"
 	};
 
+	DWORD dwFinalResult = ERR_SUCCESS; // 최종 결과 (성공 0)
 
-	// 2. GetModules() 대신, 타겟 리스트를 순회합니다.
+	// 2. 타겟 리스트를 순회합니다.
 	for (const char* dllName : targetDlls)
 	{
 		// 3. DLL 이름을 기반으로 모듈 핸들을 직접 가져옵니다.
 		HMODULE hModule = GetModuleHandleA(dllName);
 
 		if (hModule == NULL) {
-			// 해당 DLL이 아직 로드되지 않았을 수 있습니다. (정상)
+			// 해당 DLL이 아직 로드되지 않았을 수 있습니다. (정상이므로 계속)
 			continue;
 		}
 
-		// 4. UnhookModule 함수를 호출합니다.
+		// 4. UnhookModule 함수 (SurgicallyRepairHooks 호출)를 실행합니다.
 		DWORD dwResult = UnhookModule(hModule);
 
-
-}
-	// 원본 코드의 main 함수 로직을 가져와
-// 출력문과 테스트 코드를 제거하고 정리 로직을 보강한 함수입니다.
-// 성공 시 0, 실패 시 관련 에러 코드를 반환합니다.
-DWORD PerformUnhooking() {
-	DWORD dwRet = 0;
-	LPMODULE_HOOK_INFO *mods = NULL;
-	DWORD dwNumModules = 0;
-	HMODULE hModules[1024];
-	ZeroMemory(hModules, sizeof(hModules));
-
-	// 1. 모든 모듈 가져오기
-	dwRet = GetModules(
-		hModules,
-		sizeof(hModules),
-		&dwNumModules
-	);
-
-	if (dwRet) {
-		return dwRet; // GetModules 실패
-	}
-
-	// 2. 훅 정보 저장을 위한 메모리 할당
-	mods = NewModuleHookInfo(dwNumModules);
-	if (!mods) {
-		return 1; // NewModuleHookInfo 실패 (임의의 에러 코드 1)
-	}
-
-	DWORD dwNumHooks = 0;
-
-	// 3. 모든 모듈을 검사하여 훅 탐지
-	for (DWORD i = 0; i < dwNumModules; i++) {
-		DWORD cbNeeded = 0;
-		dwRet = CheckModuleForHooks(
-			hModules[i],
-			mods[i]->infos,
-			SIZEOF_ARRAY(mods[i]->infos),
-			&cbNeeded
-		);
-
-		// 원본 코드처럼 개별 모듈 검사 실패는 무시하고 계속 진행
-		// if (dwRet) { ... } 
-
-		// 훅 정보 저장
-		mods[i]->hModule = hModules[i];
-		mods[i]->dwNumHooks = cbNeeded;
-		dwNumHooks += cbNeeded;
-	}
-
-	// 4. 탐지된 훅이 있는 경우에만 제거 시도
-	if (dwNumHooks > 0) {
-		for (DWORD i = 0; i < dwNumModules; i++) {
-			if (mods[i]->dwNumHooks > 0) {
-				// 훅 제거
-				dwRet = UnhookModule(mods[i]->hModule);
-
-				if (dwRet) {
-					// UnhookModule 실패 시, 루프를 중단하고
-					// 에러 코드를 반환하기 위해 cleanup으로 이동합니다.
-					goto cleanup;
-				}
+		if (dwResult != ERR_SUCCESS) {
+			// 여러 모듈 중 하나라도 실패하면, 첫 번째 실패 코드를 기록합니다.
+			if (dwFinalResult == ERR_SUCCESS) {
+				dwFinalResult = dwResult;
 			}
+			// (필요시 에러 로그)
+			// std::cerr << "Failed to unhook " << dllName << " (Error: " << dwResult << ")" << std::endl;
 		}
 	}
 
-cleanup:
-	// 5. 할당된 모든 리소스 해제
-	// (성공/실패 여부와 관계없이 항상 실행되어야 함)
-	if (mods) {
-		for (DWORD i = 0; i < dwNumModules; i++) {
-			for (DWORD j = 0; j < mods[i]->dwNumHooks; j++) {
-				FreeHookFuncInfo(&mods[i]->infos[j]);
-			}
-		}
-		FreeModuleHookInfo(mods, dwNumModules);
-	}
-
-	// UnhookModule에서 에러가 발생했다면 dwRet에 해당 코드가,
-	// 성공적으로 완료되었다면 0이 반환됩니다.
-	return dwRet;
-}
-// 원본 코드의 main 함수 로직을 가져와
-// 출력문과 테스트 코드를 제거하고 정리 로직을 보강한 함수입니다.
-// 성공 시 0, 실패 시 관련 에러 코드를 반환합니다.
-DWORD PerformUnhooking() {
-	DWORD dwRet = 0;
-	LPMODULE_HOOK_INFO* mods = NULL;
-	DWORD dwNumModules = 0;
-	HMODULE hModules[1024];
-	ZeroMemory(hModules, sizeof(hModules));
-
-	// 1. 모든 모듈 가져오기
-	dwRet = GetModules(
-		hModules,
-		sizeof(hModules),
-		&dwNumModules
-	);
-
-	if (dwRet) {
-		return dwRet; // GetModules 실패
-	}
-
-	// 2. 훅 정보 저장을 위한 메모리 할당
-	mods = NewModuleHookInfo(dwNumModules);
-	if (!mods) {
-		return 1; // NewModuleHookInfo 실패 (임의의 에러 코드 1)
-	}
-
-	DWORD dwNumHooks = 0;
-
-	// 3. 모든 모듈을 검사하여 훅 탐지
-	for (DWORD i = 0; i < dwNumModules; i++) {
-		DWORD cbNeeded = 0;
-		dwRet = CheckModuleForHooks(
-			hModules[i],
-			mods[i]->infos,
-			SIZEOF_ARRAY(mods[i]->infos),
-			&cbNeeded
-		);
-
-		// 원본 코드처럼 개별 모듈 검사 실패는 무시하고 계속 진행
-		// if (dwRet) { ... } 
-
-		// 훅 정보 저장
-		mods[i]->hModule = hModules[i];
-		mods[i]->dwNumHooks = cbNeeded;
-		dwNumHooks += cbNeeded;
-	}
-
-	// 4. 탐지된 훅이 있는 경우에만 제거 시도
-	if (dwNumHooks > 0) {
-		for (DWORD i = 0; i < dwNumModules; i++) {
-			if (mods[i]->dwNumHooks > 0) {
-				// 훅 제거
-				dwRet = UnhookModule(mods[i]->hModule);
-
-				if (dwRet) {
-					// UnhookModule 실패 시, 루프를 중단하고
-					// 에러 코드를 반환하기 위해 cleanup으로 이동합니다.
-					goto cleanup;
-				}
-			}
-		}
-	}
-
-cleanup:
-	// 5. 할당된 모든 리소스 해제
-	// (성공/실패 여부와 관계없이 항상 실행되어야 함)
-	if (mods) {
-		for (DWORD i = 0; i < dwNumModules; i++) {
-			for (DWORD j = 0; j < mods[i]->dwNumHooks; j++) {
-				FreeHookFuncInfo(&mods[i]->infos[j]);
-			}
-		}
-		FreeModuleHookInfo(mods, dwNumModules);
-	}
-
-	// UnhookModule에서 에러가 발생했다면 dwRet에 해당 코드가,
-	// 성공적으로 완료되었다면 0이 반환됩니다.
-	return dwRet;
+	// 5. 모든 작업 완료 후 최종 결과 반환
+	return dwFinalResult;
 }

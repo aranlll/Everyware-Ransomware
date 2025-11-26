@@ -1,8 +1,29 @@
 #pragma once
 #include <Windows.h>
-#define SIZE_OF_FUNC_NAME 256
 
-typedef struct _HOOK_FUNC_INFO{
+// 1. 훅 타입 정의
+typedef enum _HOOK_TYPE {
+	HOOK_NONE,
+	HOOK_UNSUPPORTED,
+	HOOK_RELATIVE,
+	HOOK_ABSOLUTE,
+	HOOK_ABSOLUTE_INDIRECT,
+	HOOK_ABSOLUTE_INDIRECT_64
+} HOOK_TYPE;
+
+// 2. 오류 코드 정의
+#define ERR_SUCCESS 0
+#define ERR_MOD_NAME_NOT_FOUND 1
+#define ERR_CREATE_FILE_FAILED 2
+#define ERR_CREATE_FILE_MAPPING_FAILED 3
+#define ERR_CREATE_FILE_MAPPING_ALREADY_EXISTS 4
+#define ERR_MAP_FILE_FAILED 5
+#define ERR_MEM_DEPROTECT_FAILED 6
+#define ERR_MEM_REPROTECT_FAILED 7
+#define ERR_TEXT_SECTION_NOT_FOUND 8
+#define ERR_ENUM_PROCESS_MODULES_FAILED 9
+#define ERR_SIZE_TOO_SMALL 10
+
 /*훅 정보를 저장할 구조체
 	1. hModule : 함수의 핸들 모듈(함수가 원래 소속된 DLL의 메모리 시작 주소)
 	2. dwOrdinal : 함수의 고유 ID 번호
@@ -17,15 +38,13 @@ typedef struct _HOOK_FUNC_INFO{
 // LPSTR szModuleName
 
 //LPVOID와 HMODULE은 void*형이다 
-HMODULE hModule;
-DWORD dwOrdinal;
-LPVOID lpFuncAddress;
-//char형은 c언어와의 호환 + 저수준 제어
-CHAR szFuncName[SIZEOF_FUNC_NAME];
-CHAR szHookModuleName[SIZEOF_FUNC_NAME];
-LPVOID lpHookAddress;
-
-} HOOK_FUNC_INFO, *LPHOOK_FUNC_INFO;
+typedef struct _HOOK_FUNC_INFO {
+	HMODULE hModule;
+	LPVOID lpFuncAddress;
+	CHAR szFuncName[256];
+	CHAR szHookModuleName[MAX_PATH];
+	LPVOID lpHookAddress;
+} HOOK_FUNC_INFO, * LPHOOK_FUNC_INFO;
 
 LPHOOK_FUNC_INFO NewHookFuncInfo(void);
 // HookFuncInfo 포인터의 동적 할당
@@ -34,13 +53,6 @@ BOOL FreeHookFuncInfo(LPHOOK_FUNC_INFO *info);
 // 선언된 포인터 할당 해제 
 // 성공시 True 실패시 False
 
-DWORD CheckModuleForHooks(const HMODULE hModule, LPHOOK_FUNC_INFO *infos, const SIZE_T nSize, LPDWORD cbNeeded);
-
-/*hModule로 지정된 DLL을 훅 스캐닝 하여, 인라인 후킹된 함수를 찾음(변경 X)
-1. 파일 경로 찾기
-2. 복사본 로드
-3. 코드 덮어쓰기
-*/
 
 DWORD UnhookModule(const HMODULE hModule);
 // hMoudle에 있는 후킹된 코드 영역을 꺠끗한 원본 파일의 코드로 덮어쓰는 언후킹
@@ -76,4 +88,4 @@ DWORD GetModules(HMODULE *hModules, const DWORD nSize, LPDWORD dwNumModules);
 -dwNumModules : 함수가 실제로 찾은 모듈의 총 개수를 저장할 포인터
 */
 
-DWORD PerformUnhooking()
+DWORD PerformUnhooking();
