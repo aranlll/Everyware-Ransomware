@@ -1,0 +1,55 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\unhookingtest\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{9345FA09-8AFD-409C-AB09-7E6E3EA736C5}|unhookingtest\\unhookingtest.vcxproj|C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\unhooking.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9345FA09-8AFD-409C-AB09-7E6E3EA736C5}|unhookingtest\\unhookingtest.vcxproj|C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\test.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "unhooking.cpp",
+              "DocumentMoniker": "C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\unhooking.cpp",
+              "RelativeDocumentMoniker": "..\\unhooking.cpp",
+              "ToolTip": "C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\unhooking.cpp",
+              "RelativeToolTip": "..\\unhooking.cpp",
+              "ViewState": "AgIAAEUAAAAAAAAAAAAAAA8AAAADAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-12T06:23:42.727Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "test.cpp",
+              "DocumentMoniker": "C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\test.cpp",
+              "RelativeDocumentMoniker": "..\\test.cpp",
+              "ToolTip": "C:\\Users\\1\\Desktop\\\uD504\uB85C\uC81D\uD2B8\\Everyware-Ransomware\\test.cpp",
+              "RelativeToolTip": "..\\test.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-11-12T06:23:32.218Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
